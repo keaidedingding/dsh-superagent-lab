@@ -1,9 +1,21 @@
 #!/bin/sh
-# 冒烟测试：greet.sh 必须打印含问候语的单行文本
-set -e
-out=$(sh tools/greet.sh 测试员)
-echo "output: $out"
-case "$out" in
-  *"你好，测试员，今天也要开心"*) echo "ok: greeting present" ;;
-  *) echo "fail: greeting missing"; exit 1 ;;
-esac
+# Compare the complete output, including the line ending.
+set -eu
+task_tmp=$(mktemp -d)
+trap 'rm -rf "$task_tmp"' EXIT
+assert_greeting() {
+  expected=$1
+  shift
+  sh tools/greet.sh "$@" > "$task_tmp/actual"
+  printf '%s\n' "$expected" > "$task_tmp/expected"
+  if ! cmp -s "$task_tmp/expected" "$task_tmp/actual"; then
+    echo "FAIL: greeting output differs" >&2
+    diff -u "$task_tmp/expected" "$task_tmp/actual" >&2 || true
+    exit 1
+  fi
+}
+assert_greeting '你好，测试员，今天也要开心哦' '测试员'
+assert_greeting '你好，朋友，今天也要开心哦'
+assert_greeting '你好，朋友，今天也要开心哦' ''
+assert_greeting '你好，A B，今天也要开心哦' 'A B'
+echo 'ok: all greeting outputs match exactly'
